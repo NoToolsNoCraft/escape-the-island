@@ -29,13 +29,13 @@
 
 <div id="ui">
   <div id="menu">
-    <h1>Escape The Island</h1>
+    <h1 style="z-index: 1000; text-shadow: white;">Escape The Island</h1>
     <h2>Choose Files To Open</h2>
-    <div>
+    <div style="margin-bottom: 1rem;">
       <button id="btn-escapers">Escapers</button>
       <button id="btn-defenders">The Hosts</button>
     </div>
-    <div id="char-select"></div>
+    <div id="char-select" style="align-items: center; text-align: center;"></div>
     <button id="btn-start" disabled>Let The Party Begin!</button>
   </div>
 
@@ -243,7 +243,7 @@ function drawCannon(c) {
   ctx.textAlign = "center"; ctx.font = "bold 14px Arial";
   ctx.fillText(c.emoji + " " + c.name, c.x, c.y - 35);
   ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(c.x - 20, c.y - 50, 40, 4);
-  ctx.fillStyle = "#4caf50"; ctx.fillRect(c.x - 20, c.y - 50, 40 * (c.health/100), 4);
+  ctx.fillStyle = "#65f06a"; ctx.fillRect(c.x - 20, c.y - 50, 40 * (c.health/100), 4);
 }
 
 function drawGame() {
