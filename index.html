@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Island Cannons: Bedrock Edition</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<style>
+  body { margin: 0; padding: 0; height: 100vh; overflow: hidden; font-family: 'Segoe UI', Tahoma, sans-serif; background: #004d61; color: #eee; }
+  #ui { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
+  #menu, #game-over { position: absolute; inset: 0; background: rgba(0,20,30,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: all; }
+  h1 { font-size: 3.5rem; margin: 0.2em; text-shadow: 0 4px 10px rgba(0,0,0,0.5); color: #ffce54; text-align: center; }
+  h2 { font-size: 1.8rem; margin: 0.5em 0; color: #4fc3f7; }
+  button { font-size: 1.2rem; padding: 0.8em 1.5em; margin: 0.5em; border: none; border-radius: 8px; background: #26a69a; color: white; cursor: pointer; transition: 0.2s; box-shadow: 0 4px #00796b; }
+  button:hover { background: #4db6ac; }
+  button:active { transform: translateY(2px); box-shadow: 0 2px #00796b; }
+  button.selected { background: #ff8f00; box-shadow: 0 4px #c67100; }
+  button:disabled { background: #555; box-shadow: none; cursor: default; }
+  #wind-info { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); font-size: 1.2rem; background: rgba(0,0,0,0.4); padding: 5px 20px; border-radius: 20px; }
+  #turn-info { position: absolute; top: 50px; left: 50%; transform: translateX(-50%); font-size: 1.8rem; font-weight: bold; color: #fff; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+  .bar-container { position: absolute; bottom: 20px; width: 40%; background: rgba(0,0,0,0.6); border-radius: 5px; height: 30px; overflow: hidden; border: 2px solid #fff; }
+  #power-bar-container { left: 5%; }
+  #angle-bar-container { right: 5%; }
+  .bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #ff5722, #ffeb3b); }
+  .bar-text { position: absolute; width: 100%; text-align: center; top: 5px; font-weight: bold; font-size: 1rem; color: white; text-shadow: 1px 1px 2px black; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+
+<div id="ui">
+  <div id="menu">
+    <h1>Escape The Island</h1>
+    <h2>Pick Your Side</h2>
+    <div>
+      <button id="btn-escapers">Escapers</button>
+      <button id="btn-defenders">Defenders</button>
+    </div>
+    <div id="char-select"></div>
+    <button id="btn-start" disabled>Let The Party Begin!</button>
+  </div>
+
+  <div id="game-over" style="display:none">
+    <h1 id="result-title">VICTORY</h1>
+    <h2 id="winner-text"></h2>
+    <button onclick="location.reload()">Open New Files</button>
+  </div>
+
+  <div id="wind-info">Wind: 0 km/h</div>
+  <div id="turn-info">Your Turn</div>
+
+  <div id="power-bar-container" class="bar-container" style="display:none">
+    <div id="power-bar" class="bar-fill"></div>
+    <div id="power-text" class="bar-text">Power: 0%</div>
+  </div>
+
+  <div id="angle-bar-container" class="bar-container" style="display:none">
+    <div id="angle-bar" class="bar-fill" style="background: #03a9f4"></div>
+    <div id="angle-text" class="bar-text">Angle: 45°</div>
+  </div>
+</div>
+
+<canvas id="c"></canvas>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let WIDTH, HEIGHT;
+let gameStarted = false;
+
+// Game Constants
+const GRAVITY = 0.35;
+let MIN_TERRAIN_Y; // The "Bedrock" level
+let wind = 0;
+let terrain = [];
+let scenery = []; 
+let leftCannon, rightCannon;
+let projectiles = [];
+let explosions = [];
+let playerTurn = true;
+let side = null;
+let playerChar, aiChar;
+
+const ESCAPERS = [
+  {name:"The Oringe Guy", color:"#ff8c00", emoji:"👱‍♂️", power:1.15}, // High impact
+  {name:"Gill Bates", color:"#00a4ef", emoji:"💉", power:0.95},    // Precise/calculated
+  {name:"Ee-lon", color:"#5ae2ff", emoji:"🚀", power:1.25}       // High power, high chaos
+];
+
+const DEFENDERS = [
+  {name:"Jefree", color:"#8e44ad", emoji:"🏝️", power:1.05},      // The Island "defender"
+  {name:"Clingon", color:"#2ecc71", emoji:"🎷", power:1.0},       // Legacy power
+  {name:"The Prince", color:"#34495e", emoji:"🚁", power:0.90}    // High defense, lower output
+];
+
+function resize() {
+  WIDTH = canvas.width = window.innerWidth;
+  HEIGHT = canvas.height = window.innerHeight;
+  MIN_TERRAIN_Y = HEIGHT * 0.92; // 8% from the bottom is indestructible
+  if(gameStarted) generateTerrain();
+}
+window.addEventListener('resize', resize);
+resize();
+
+function generateTerrain() {
+  terrain = [];
+  scenery = [];
+  const points = 350; 
+  const seg = WIDTH / points;
+  let currentY = HEIGHT * 0.65;
+
+  for (let i = 0; i <= points; i++) {
+    const x = i * seg;
+    let smoothness = (x < WIDTH * 0.2 || x > WIDTH * 0.8) ? 0.2 : 1.0;
+    currentY += (Math.sin(i * 0.05) * 8 + (Math.random() * 6 - 3)) * smoothness;
+    // Clamp between top limit and bedrock
+    currentY = Math.max(HEIGHT * 0.4, Math.min(MIN_TERRAIN_Y - 20, currentY));
+    terrain.push({x: x, y: currentY});
+  }
+  
+  for (let i = 0; i < 10; i++) {
+    let rx = Math.random() * WIDTH;
+    scenery.push({ x: rx, type: Math.random() > 0.4 ? 'palm' : 'rock', size: 0.7 + Math.random() * 0.6 });
+  }
+}
+
+function getTerrainY(x) {
+  const idx = Math.floor((x / WIDTH) * (terrain.length - 1));
+  const clampedIdx = Math.max(0, Math.min(terrain.length - 2, idx));
+  const t = (x - terrain[clampedIdx].x) / (terrain[clampedIdx+1].x - terrain[clampedIdx].x);
+  return terrain[clampedIdx].y * (1-t) + terrain[clampedIdx+1].y * t;
+}
+
+function createExplosion(x, y, radius) {
+  explosions.push({x, y, life: 20, maxR: radius});
+
+  const craterRadius = radius * 1.5; 
+  terrain.forEach(p => {
+    const dx = p.x - x;
+    const dist = Math.abs(dx);
+
+    if (dist < craterRadius) {
+      const carveImpact = Math.sqrt(Math.pow(craterRadius, 2) - Math.pow(dx, 2));
+      let targetY = y + (carveImpact * 0.8);
+      
+      // THE FIX: Do not allow p.y to exceed Bedrock
+      if (targetY > MIN_TERRAIN_Y) targetY = MIN_TERRAIN_Y;
+
+      if (p.y < targetY) {
+        p.y = targetY;
+      }
+    }
+  });
+}
+
+function drawScenery() {
+  scenery.forEach(s => {
+    let currentY = getTerrainY(s.x);
+    if (currentY >= MIN_TERRAIN_Y - 5) return; // Hide palms if they fall into bedrock
+    ctx.save();
+    ctx.translate(s.x, currentY);
+    ctx.scale(s.size, s.size);
+    if(s.type === 'palm') {
+      ctx.fillStyle = "#5d4037"; ctx.fillRect(-3, -35, 6, 35);
+      ctx.fillStyle = "#2e7d32";
+      for(let i=0; i<5; i++) {
+        ctx.beginPath(); ctx.ellipse(0, -35, 20, 6, (i * 72) * Math.PI/180, 0, Math.PI*2); ctx.fill();
+      }
+    } else {
+      ctx.fillStyle = "#757575";
+      ctx.beginPath(); ctx.moveTo(-10, 0); ctx.lineTo(-6, -6); ctx.lineTo(0, -10); ctx.lineTo(6, -5); ctx.lineTo(10, 0); ctx.fill();
+    }
+    ctx.restore();
+  });
+}
+
+class Projectile {
+  constructor(x, y, ang, pwr, side) {
+    this.x = x; this.y = y;
+    let r = ang * Math.PI / 180;
+    let mult = pwr * 0.25;
+    this.vx = Math.cos(r) * mult * (side === 'left' ? 1 : -1);
+    this.vy = -Math.sin(r) * mult;
+    this.side = side;
+  }
+  update() {
+    this.vx += wind * 0.01;
+    this.vy += GRAVITY;
+    this.x += this.vx; this.y += this.vy;
+    
+    let enemy = this.side === 'left' ? rightCannon : leftCannon;
+    let dist = Math.hypot(this.x - enemy.x, this.y - (enemy.y - 10));
+    
+    if (dist < 25) {
+      enemy.health -= 35;
+      createExplosion(this.x, this.y, 50);
+      return true;
+    }
+
+    if (this.y >= getTerrainY(this.x)) {
+      createExplosion(this.x, this.y, 45); 
+      return true;
+    }
+    return this.x < 0 || this.x > WIDTH || this.y > HEIGHT;
+  }
+  draw() {
+    ctx.fillStyle = "#111";
+    ctx.beginPath(); ctx.arc(this.x, this.y, 6, 0, Math.PI*2); ctx.fill();
+  }
+}
+
+function drawAimGuide() {
+  if (!playerTurn || !gameStarted || charging) return;
+  ctx.setLineDash([5, 5]);
+  ctx.strokeStyle = "rgba(255,255,255,0.4)";
+  ctx.beginPath();
+  let tx = leftCannon.x;
+  let ty = leftCannon.y - 10;
+  let r = currentAngle * Math.PI / 180;
+  let pwr = 45; 
+  let tvx = Math.cos(r) * pwr * 0.25;
+  let tvy = -Math.sin(r) * pwr * 0.25;
+  
+  ctx.moveTo(tx, ty);
+  for(let i=0; i<30; i++) {
+    tvx += wind * 0.01;
+    tvy += GRAVITY;
+    tx += tvx; ty += tvy;
+    ctx.lineTo(tx, ty);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawCannon(c) {
+  c.y = getTerrainY(c.x);
+  ctx.save();
+  ctx.translate(c.x, c.y);
+  ctx.fillStyle = "#263238"; ctx.fillRect(-18, -8, 36, 12);
+  ctx.rotate((c.side === 'left' ? -c.angle : c.angle-180) * Math.PI/180);
+  ctx.fillStyle = c.color; ctx.fillRect(0, -4, 35, 8);
+  ctx.restore();
+  
+  ctx.textAlign = "center"; ctx.font = "bold 14px Arial";
+  ctx.fillText(c.emoji + " " + c.name, c.x, c.y - 35);
+  ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(c.x - 20, c.y - 50, 40, 4);
+  ctx.fillStyle = "#4caf50"; ctx.fillRect(c.x - 20, c.y - 50, 40 * (c.health/100), 4);
+}
+
+function drawGame() {
+  // Sky
+  const skyGrad = ctx.createLinearGradient(0,0,0,HEIGHT);
+  skyGrad.addColorStop(0, "#4fc3f7"); skyGrad.addColorStop(1, "#0288d1");
+  ctx.fillStyle = skyGrad; ctx.fillRect(0,0,WIDTH,HEIGHT);
+
+  // INDESTRUCTIBLE BEDROCK (The Rock Layer)
+  ctx.fillStyle = "#37474f";
+  ctx.fillRect(0, MIN_TERRAIN_Y, WIDTH, HEIGHT - MIN_TERRAIN_Y);
+  // Add some detail to the rock
+  ctx.strokeStyle = "#263238"; ctx.lineWidth = 2;
+  for(let i=0; i<WIDTH; i+=50) {
+    ctx.beginPath(); ctx.moveTo(i, MIN_TERRAIN_Y); ctx.lineTo(i+20, HEIGHT); ctx.stroke();
+  }
+
+  // Island Sand
+  ctx.fillStyle = "#edc9af"; 
+  ctx.beginPath(); ctx.moveTo(0, HEIGHT);
+  terrain.forEach(p => ctx.lineTo(p.x, p.y));
+  ctx.lineTo(WIDTH, HEIGHT); ctx.fill();
+
+  drawScenery();
+  drawAimGuide();
+  drawCannon(leftCannon);
+  drawCannon(rightCannon);
+
+  projectiles.forEach(p => p.draw());
+  
+  explosions.forEach((e, i) => {
+    ctx.fillStyle = `rgba(255, ${100 + e.life*6}, 0, ${e.life/20})`;
+    ctx.beginPath(); ctx.arc(e.x, e.y, (20-e.life)*7, 0, Math.PI*2); ctx.fill();
+    e.life--;
+    if(e.life <= 0) explosions.splice(i, 1);
+  });
+}
+
+function animate() {
+  if(!gameStarted) return;
+  drawGame();
+  
+  document.getElementById("angle-bar").style.width = (currentAngle/90*100) + "%";
+  document.getElementById("angle-text").textContent = `Angle: ${currentAngle}°`;
+  if(charging) {
+    let pwr = Math.min(100, (Date.now() - chargeStart) / 10);
+    document.getElementById("power-bar").style.width = pwr + "%";
+    document.getElementById("power-text").textContent = `Power: ${Math.floor(pwr)}%`;
+  }
+  
+  for(let i=projectiles.length-1; i>=0; i--) {
+    if(projectiles[i].update()) projectiles.splice(i, 1);
+  }
+  
+  if (Math.random() < 0.01) {
+    wind += (Math.random() - 0.5) * 0.45;
+    wind = Math.max(-5, Math.min(5, wind));
+    document.getElementById("wind-info").textContent = `Wind: ${wind > 0 ? '→' : '←'} ${Math.abs(wind).toFixed(1)} km/h`;
+  }
+
+  if (leftCannon.health <= 0 || rightCannon.health <= 0) {
+    if(projectiles.length === 0) endGame();
+  }
+
+  requestAnimationFrame(animate);
+}
+
+function endGame() {
+    gameStarted = false;
+    const gameOverScreen = document.getElementById("game-over");
+    const resultTitle = document.getElementById("result-title");
+    const winText = document.getElementById("winner-text");
+    
+    if (leftCannon.health <= 0) {
+      resultTitle.textContent = "DEFEAT";
+      resultTitle.style.color = "#ff5252";
+      winText.textContent = `${aiChar.name} has released your emails!`;
+    } else {
+      resultTitle.textContent = "VICTORY";
+      resultTitle.style.color = "#ffce54";
+      winText.textContent = `The ${playerChar.side} prevail!`;
+    }
+    gameOverScreen.style.display = "flex";
+}
+
+let charging = false; let chargeStart = 0; let currentAngle = 45;
+window.onkeydown = (e) => {
+  if(!playerTurn || !gameStarted || projectiles.length > 0) return;
+  if(e.key === " ") { if(!charging) { charging = true; chargeStart = Date.now(); } }
+  if(e.key === "ArrowUp") currentAngle = Math.min(90, currentAngle + 2);
+  if(e.key === "ArrowDown") currentAngle = Math.max(0, currentAngle - 2);
+};
+window.onkeyup = (e) => {
+  if(e.key === " " && charging) {
+    let pwr = Math.min(100, (Date.now() - chargeStart) / 10);
+    projectiles.push(new Projectile(leftCannon.x, leftCannon.y-10, currentAngle, pwr, 'left'));
+    charging = false; playerTurn = false;
+    document.getElementById("turn-info").textContent = "Enemy Aiming...";
+    setTimeout(aiTurn, 1600);
+  }
+};
+
+const btnEsc = document.getElementById("btn-escapers");
+const btnDef = document.getElementById("btn-defenders");
+const charSelect = document.getElementById("char-select");
+const btnStart = document.getElementById("btn-start");
+
+btnEsc.onclick = () => { side = "escapers"; btnEsc.classList.add("selected"); btnDef.classList.remove("selected"); setupChars(); };
+btnDef.onclick = () => { side = "defenders"; btnDef.classList.add("selected"); btnEsc.classList.remove("selected"); setupChars(); };
+
+function setupChars() {
+  charSelect.innerHTML = "";
+  let list = side === "escapers" ? ESCAPERS : DEFENDERS;
+  list.forEach((c) => {
+    let b = document.createElement("button");
+    b.textContent = `${c.emoji} ${c.name}`;
+    b.onclick = () => {
+      playerChar = {...c, side: side};
+      document.querySelectorAll("#char-select button").forEach(btn => btn.classList.remove("selected"));
+      b.classList.add("selected"); btnStart.disabled = false;
+    };
+    charSelect.appendChild(b);
+  });
+}
+
+function aiTurn() {
+  if(!gameStarted) return;
+  let dist = rightCannon.x - leftCannon.x;
+  let angle = 20 + Math.random() * 40;
+  let power = (dist / 10) + (Math.random() * 12 - 6) - (wind * 10);
+  projectiles.push(new Projectile(rightCannon.x, rightCannon.y-10, angle, Math.max(20, power), 'right'));
+  playerTurn = true;
+  document.getElementById("turn-info").textContent = "Your Turn";
+}
+
+btnStart.onclick = () => {
+  let aiSide = side === "escapers" ? "defenders" : "escapers";
+  let aiList = aiSide === "escapers" ? ESCAPERS : DEFENDERS;
+  aiChar = {...aiList[Math.floor(Math.random()*aiList.length)], side: aiSide};
+  document.getElementById("menu").style.display = "none";
+  document.getElementById("power-bar-container").style.display = "block";
+  document.getElementById("angle-bar-container").style.display = "block";
+  generateTerrain();
+  leftCannon = { x: WIDTH*0.15, y: 0, health: 100, color: playerChar.color, emoji: playerChar.emoji, side: 'left', angle: 45, name: playerChar.name };
+  rightCannon = { x: WIDTH*0.85, y: 0, health: 100, color: aiChar.color, emoji: aiChar.emoji, side: 'right', angle: 45, name: aiChar.name };
+  gameStarted = true; animate();
+};
+</script>
+</body>
+</html>
