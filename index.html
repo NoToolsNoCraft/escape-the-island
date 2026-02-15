@@ -5,33 +5,81 @@
 <title>Escape the Island</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <style>
-  body { margin: 0; padding: 0; height: 100vh; overflow: hidden; font-family: 'Segoe UI', Tahoma, sans-serif; background: #004d61; color: #eee; }
+  body { margin: 0; padding: 0; height: 100vh; overflow: hidden; font-family: 'Segoe UI', Tahoma, sans-serif; background: #004d61; color: #eee; touch-action: manipulation; }
   #ui { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
-  #menu, #game-over { position: absolute; inset: 0; background: rgba(0,20,30,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: all; }
+ #menu, #game-over { 
+  position: absolute; 
+  inset: 0; 
+  background: rgba(0,20,30,0.9); 
+  display: flex; 
+  flex-direction: column; 
+  align-items: center; 
+  /* Changed from center to flex-start to allow proper scrolling */
+  justify-content: flex-start; 
+  pointer-events: all; 
+  z-index: 100;
+  /* Enable vertical scrolling */
+  overflow-y: auto; 
+  padding: 20px 10px;
+  /* Smooth scrolling for iOS */
+  -webkit-overflow-scrolling: touch; 
+}
+
+/* Ensure the character select container doesn't collapse */
+#char-select {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+/* Optional: Make buttons slightly more compact on small screens 
+   to fit more content before needing to scroll */
+@media (max-height: 600px) {
+  h1 { font-size: 1.8rem; }
+  h2 { font-size: 1.2rem; margin: 0.2rem 0; }
+  button { padding: 0.5em 1em; margin: 0.3em; }
+}
   h1 { font-size: 3.5rem; margin: 0.2em; text-shadow: 0 4px 10px rgba(0,0,0,0.5); color: #ffce54; text-align: center; }
   h2 { font-size: 1.8rem; margin: 0.5em 0; color: #4fc3f7; }
-  button { font-size: 1.2rem; padding: 0.8em 1.5em; margin: 0.5em; border: none; border-radius: 8px; background: #26a69a; color: white; cursor: pointer; transition: 0.2s; box-shadow: 0 4px #00796b; }
+  button { font-size: 1.2rem; padding: 0.8em 1.5em; margin: 0.5em; border: none; border-radius: 8px; background: #26a69a; color: white; cursor: pointer; transition: 0.2s; box-shadow: 0 4px #00796b; -webkit-tap-highlight-color: transparent; }
   button:hover { background: #4db6ac; }
   button:active { transform: translateY(2px); box-shadow: 0 2px #00796b; }
   button.selected { background: #ff8f00; box-shadow: 0 4px #c67100; }
   button:disabled { background: #555; box-shadow: none; cursor: default; }
-  #wind-info { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); font-size: 1.2rem; background: rgba(0,0,0,0.4); padding: 5px 20px; border-radius: 20px; }
-  #turn-info { position: absolute; top: 50px; left: 50%; transform: translateX(-50%); font-size: 1.8rem; font-weight: bold; color: #fff; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
-  .bar-container { position: absolute; bottom: 20px; width: 40%; background: rgba(0,0,0,0.6); border-radius: 5px; height: 30px; overflow: hidden; border: 2px solid #fff; }
+  
+  #hud-top { position: absolute; top: 5px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; pointer-events: none; width: 100%; max-width: 400px; }
+  #wind-info { font-size: 0.8rem; background: rgba(0,0,0,0.4); padding: 2px 10px; border-radius: 10px; display: none; margin-bottom: 2px; }
+  #turn-info { font-size: 1.1rem; font-weight: bold; color: #fff; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); display: none; margin-bottom: 5px; }
+  
+  #mobile-controls { display: none; gap: 10px; pointer-events: none; opacity: 0.9; }
+  .m-btn { pointer-events: all; width: 42px; height: 42px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1rem; user-select: none; margin: 0; padding: 0; border: 1px solid rgba(255,255,255,0.2); }
+  #btn-fire { background: #e91e63; box-shadow: 0 3px #ad1457; width: 60px; font-size: 0.9rem; }
+  .m-btn-small { background: #03a9f4; box-shadow: 0 3px #0288d1; }
+  
+  .bar-container { position: absolute; bottom: 20px; width: 35%; background: rgba(0,0,0,0.6); border-radius: 5px; height: 26px; overflow: hidden; border: 2px solid #fff; display: none; }
   #power-bar-container { left: 5%; }
   #angle-bar-container { right: 5%; }
   .bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #ff5722, #ffeb3b); }
-  .bar-text { position: absolute; width: 100%; text-align: center; top: 5px; font-weight: bold; font-size: 1rem; color: white; text-shadow: 1px 1px 2px black; }
+  .bar-text { position: absolute; width: 100%; text-align: center; top: 4px; font-weight: bold; font-size: 0.85rem; color: white; text-shadow: 1px 1px 2px black; }
+  
   canvas { display: block; }
+  
+  @media (max-width: 1024px) {
+    body.playing #mobile-controls { display: flex; }
+    .bar-container { width: 42%; bottom: 10px; height: 22px; }
+    .bar-text { font-size: 0.75rem; top: 2px; }
+    h1 { font-size: 2rem; }
+  }
 </style>
 </head>
 <body>
 
 <div id="ui">
   <div id="menu">
-    <h1 style="z-index: 1000; text-shadow: white;">Escape The Island</h1>
-    <h2>Choose Files To Open</h2>
-    <div style="margin-bottom: 1rem;">
+    <h1 style="text-shadow: 2px 2px #000;">Escape The Island</h1>
+    <h2 style="text-align:center;">Choose Files To Open</h2>
+    <div style="margin-bottom: 1rem; text-align: center;">
       <button id="btn-escapers">Escapers</button>
       <button id="btn-defenders">The Hosts</button>
     </div>
@@ -45,15 +93,22 @@
     <button onclick="location.reload()">Open New Files</button>
   </div>
 
-  <div id="wind-info">Wind: 0 km/h</div>
-  <div id="turn-info">Your Turn</div>
+  <div id="hud-top">
+    <div id="wind-info">Wind: 0 km/h</div>
+    <div id="turn-info">Your Turn</div>
+    <div id="mobile-controls">
+      <button class="m-btn m-btn-small" id="btn-up">↑</button>
+      <button class="m-btn m-btn-small" id="btn-down">↓</button>
+      <button class="m-btn" id="btn-fire">FIRE</button>
+    </div>
+  </div>
 
-  <div id="power-bar-container" class="bar-container" style="display:none">
+  <div id="power-bar-container" class="bar-container">
     <div id="power-bar" class="bar-fill"></div>
     <div id="power-text" class="bar-text">Power: 0%</div>
   </div>
 
-  <div id="angle-bar-container" class="bar-container" style="display:none">
+  <div id="angle-bar-container" class="bar-container">
     <div id="angle-bar" class="bar-fill" style="background: #03a9f4"></div>
     <div id="angle-text" class="bar-text">Angle: 45°</div>
   </div>
@@ -67,9 +122,8 @@ const ctx = canvas.getContext('2d');
 let WIDTH, HEIGHT;
 let gameStarted = false;
 
-// Game Constants
 const GRAVITY = 0.35;
-let MIN_TERRAIN_Y; // The "Bedrock" level
+let MIN_TERRAIN_Y; 
 let wind = 0;
 let terrain = [];
 let scenery = []; 
@@ -79,23 +133,24 @@ let explosions = [];
 let playerTurn = true;
 let side = null;
 let playerChar, aiChar;
+let aiShotsFired = 0;
 
 const ESCAPERS = [
-  {name:"The Oringe Guy", color:"#ff8c00", emoji:"👱‍♂️", power:1.15}, // High impact
-  {name:"Gill Bates", color:"#00a4ef", emoji:"💉", power:0.95},    // Precise/calculated
-  {name:"Ee-lon", color:"#5ae2ff", emoji:"🚀", power:1.25}       // High power, high chaos
+  {name:"The Oringe Guy", color:"#ff8c00", emoji:"👱‍♂️", power:1.15},
+  {name:"Gill Bates", color:"#00a4ef", emoji:"💉", power:0.95},
+  {name:"Ee-lon", color:"#5ae2ff", emoji:"🚀", power:1.25}
 ];
 
 const DEFENDERS = [
-  {name:"Jefree", color:"#8e44ad", emoji:"🏝️", power:1.05},      // The Island "defender"
-  {name:"Clingon", color:"#2ecc71", emoji:"🎷", power:1.0},       // Legacy power
-  {name:"The Prince", color:"#34495e", emoji:"🚁", power:0.90}    // High defense, lower output
+  {name:"Jefree", color:"#8e44ad", emoji:"🏝️", power:1.05},
+  {name:"Clingon", color:"#2ecc71", emoji:"🎷", power:1.0},
+  {name:"The Prince", color:"#34495e", emoji:"🚁", power:0.90}
 ];
 
 function resize() {
   WIDTH = canvas.width = window.innerWidth;
   HEIGHT = canvas.height = window.innerHeight;
-  MIN_TERRAIN_Y = HEIGHT * 0.92; // 8% from the bottom is indestructible
+  MIN_TERRAIN_Y = HEIGHT * 0.92;
   if(gameStarted) generateTerrain();
 }
 window.addEventListener('resize', resize);
@@ -112,7 +167,6 @@ function generateTerrain() {
     const x = i * seg;
     let smoothness = (x < WIDTH * 0.2 || x > WIDTH * 0.8) ? 0.2 : 1.0;
     currentY += (Math.sin(i * 0.05) * 8 + (Math.random() * 6 - 3)) * smoothness;
-    // Clamp between top limit and bedrock
     currentY = Math.max(HEIGHT * 0.4, Math.min(MIN_TERRAIN_Y - 20, currentY));
     terrain.push({x: x, y: currentY});
   }
@@ -132,22 +186,15 @@ function getTerrainY(x) {
 
 function createExplosion(x, y, radius) {
   explosions.push({x, y, life: 20, maxR: radius});
-
   const craterRadius = radius * 1.5; 
   terrain.forEach(p => {
     const dx = p.x - x;
     const dist = Math.abs(dx);
-
     if (dist < craterRadius) {
       const carveImpact = Math.sqrt(Math.pow(craterRadius, 2) - Math.pow(dx, 2));
       let targetY = y + (carveImpact * 0.8);
-      
-      // THE FIX: Do not allow p.y to exceed Bedrock
       if (targetY > MIN_TERRAIN_Y) targetY = MIN_TERRAIN_Y;
-
-      if (p.y < targetY) {
-        p.y = targetY;
-      }
+      if (p.y < targetY) p.y = targetY;
     }
   });
 }
@@ -155,7 +202,7 @@ function createExplosion(x, y, radius) {
 function drawScenery() {
   scenery.forEach(s => {
     let currentY = getTerrainY(s.x);
-    if (currentY >= MIN_TERRAIN_Y - 5) return; // Hide palms if they fall into bedrock
+    if (currentY >= MIN_TERRAIN_Y - 5) return;
     ctx.save();
     ctx.translate(s.x, currentY);
     ctx.scale(s.size, s.size);
@@ -186,16 +233,13 @@ class Projectile {
     this.vx += wind * 0.01;
     this.vy += GRAVITY;
     this.x += this.vx; this.y += this.vy;
-    
     let enemy = this.side === 'left' ? rightCannon : leftCannon;
     let dist = Math.hypot(this.x - enemy.x, this.y - (enemy.y - 10));
-    
     if (dist < 25) {
       enemy.health -= 35;
       createExplosion(this.x, this.y, 50);
       return true;
     }
-
     if (this.y >= getTerrainY(this.x)) {
       createExplosion(this.x, this.y, 45); 
       return true;
@@ -219,7 +263,6 @@ function drawAimGuide() {
   let pwr = 45; 
   let tvx = Math.cos(r) * pwr * 0.25;
   let tvy = -Math.sin(r) * pwr * 0.25;
-  
   ctx.moveTo(tx, ty);
   for(let i=0; i<30; i++) {
     tvx += wind * 0.01;
@@ -239,7 +282,6 @@ function drawCannon(c) {
   ctx.rotate((c.side === 'left' ? -c.angle : c.angle-180) * Math.PI/180);
   ctx.fillStyle = c.color; ctx.fillRect(0, -4, 35, 8);
   ctx.restore();
-  
   ctx.textAlign = "center"; ctx.font = "bold 14px Arial";
   ctx.fillText(c.emoji + " " + c.name, c.x, c.y - 35);
   ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(c.x - 20, c.y - 50, 40, 4);
@@ -247,33 +289,24 @@ function drawCannon(c) {
 }
 
 function drawGame() {
-  // Sky
   const skyGrad = ctx.createLinearGradient(0,0,0,HEIGHT);
   skyGrad.addColorStop(0, "#4fc3f7"); skyGrad.addColorStop(1, "#0288d1");
   ctx.fillStyle = skyGrad; ctx.fillRect(0,0,WIDTH,HEIGHT);
-
-  // INDESTRUCTIBLE BEDROCK (The Rock Layer)
   ctx.fillStyle = "#37474f";
   ctx.fillRect(0, MIN_TERRAIN_Y, WIDTH, HEIGHT - MIN_TERRAIN_Y);
-  // Add some detail to the rock
   ctx.strokeStyle = "#263238"; ctx.lineWidth = 2;
   for(let i=0; i<WIDTH; i+=50) {
     ctx.beginPath(); ctx.moveTo(i, MIN_TERRAIN_Y); ctx.lineTo(i+20, HEIGHT); ctx.stroke();
   }
-
-  // Island Sand
   ctx.fillStyle = "#edc9af"; 
   ctx.beginPath(); ctx.moveTo(0, HEIGHT);
   terrain.forEach(p => ctx.lineTo(p.x, p.y));
   ctx.lineTo(WIDTH, HEIGHT); ctx.fill();
-
   drawScenery();
   drawAimGuide();
   drawCannon(leftCannon);
   drawCannon(rightCannon);
-
   projectiles.forEach(p => p.draw());
-  
   explosions.forEach((e, i) => {
     ctx.fillStyle = `rgba(255, ${100 + e.life*6}, 0, ${e.life/20})`;
     ctx.beginPath(); ctx.arc(e.x, e.y, (20-e.life)*7, 0, Math.PI*2); ctx.fill();
@@ -285,7 +318,6 @@ function drawGame() {
 function animate() {
   if(!gameStarted) return;
   drawGame();
-  
   document.getElementById("angle-bar").style.width = (currentAngle/90*100) + "%";
   document.getElementById("angle-text").textContent = `Angle: ${currentAngle}°`;
   if(charging) {
@@ -293,30 +325,32 @@ function animate() {
     document.getElementById("power-bar").style.width = pwr + "%";
     document.getElementById("power-text").textContent = `Power: ${Math.floor(pwr)}%`;
   }
-  
   for(let i=projectiles.length-1; i>=0; i--) {
     if(projectiles[i].update()) projectiles.splice(i, 1);
   }
-  
   if (Math.random() < 0.01) {
     wind += (Math.random() - 0.5) * 0.45;
     wind = Math.max(-5, Math.min(5, wind));
     document.getElementById("wind-info").textContent = `Wind: ${wind > 0 ? '→' : '←'} ${Math.abs(wind).toFixed(1)} km/h`;
   }
-
   if (leftCannon.health <= 0 || rightCannon.health <= 0) {
     if(projectiles.length === 0) endGame();
   }
-
   requestAnimationFrame(animate);
 }
 
 function endGame() {
     gameStarted = false;
+    document.body.classList.remove('playing');
     const gameOverScreen = document.getElementById("game-over");
     const resultTitle = document.getElementById("result-title");
     const winText = document.getElementById("winner-text");
     
+    document.getElementById("wind-info").style.display = "none";
+    document.getElementById("turn-info").style.display = "none";
+    document.getElementById("power-bar-container").style.display = "none";
+    document.getElementById("angle-bar-container").style.display = "none";
+
     if (leftCannon.health <= 0) {
       resultTitle.textContent = "DEFEAT";
       resultTitle.style.color = "#ff5252";
@@ -330,6 +364,7 @@ function endGame() {
 }
 
 let charging = false; let chargeStart = 0; let currentAngle = 45;
+
 window.onkeydown = (e) => {
   if(!playerTurn || !gameStarted || projectiles.length > 0) return;
   if(e.key === " ") { if(!charging) { charging = true; chargeStart = Date.now(); } }
@@ -337,14 +372,42 @@ window.onkeydown = (e) => {
   if(e.key === "ArrowDown") currentAngle = Math.max(0, currentAngle - 2);
 };
 window.onkeyup = (e) => {
-  if(e.key === " " && charging) {
+  if(e.key === " " && charging) fire();
+};
+
+const btnUp = document.getElementById("btn-up");
+const btnDown = document.getElementById("btn-down");
+const btnFire = document.getElementById("btn-fire");
+
+function fire() {
+    if(!charging) return;
     let pwr = Math.min(100, (Date.now() - chargeStart) / 10);
     projectiles.push(new Projectile(leftCannon.x, leftCannon.y-10, currentAngle, pwr, 'left'));
     charging = false; playerTurn = false;
     document.getElementById("turn-info").textContent = "Enemy Aiming...";
     setTimeout(aiTurn, 1600);
-  }
-};
+}
+
+btnFire.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    if(!playerTurn || !gameStarted || projectiles.length > 0) return;
+    if(!charging) { charging = true; chargeStart = Date.now(); }
+});
+btnFire.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    fire();
+});
+
+let angleInterval;
+btnUp.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    angleInterval = setInterval(() => { currentAngle = Math.min(90, currentAngle + 2); }, 50);
+});
+btnDown.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    angleInterval = setInterval(() => { currentAngle = Math.max(0, currentAngle - 2); }, 50);
+});
+window.addEventListener('touchend', () => clearInterval(angleInterval));
 
 const btnEsc = document.getElementById("btn-escapers");
 const btnDef = document.getElementById("btn-defenders");
@@ -369,24 +432,84 @@ function setupChars() {
   });
 }
 
+/**
+ * HIGH-LEVEL AI BRAIN
+ * Uses a simulation-based binary search to find the perfect shot.
+ */
 function aiTurn() {
   if(!gameStarted) return;
-  let dist = rightCannon.x - leftCannon.x;
-  let angle = 20 + Math.random() * 40;
-  let power = (dist / 10) + (Math.random() * 12 - 6) - (wind * 10);
-  projectiles.push(new Projectile(rightCannon.x, rightCannon.y-10, angle, Math.max(20, power), 'right'));
+  
+  const targetX = leftCannon.x;
+  const targetY = leftCannon.y - 10;
+  const startX = rightCannon.x;
+  const startY = rightCannon.y - 10;
+  
+  // Choose a consistent high angle for better arc shots
+  let bestAngle = 45 + (Math.random() * 15); 
+  let bestPower = 0;
+  
+  // SIMULATION: Binary search for the right power level (0 to 100)
+  let minP = 0, maxP = 150; // MaxP higher than 100 for safety in search
+  for(let i=0; i < 15; i++) {
+    let midP = (minP + maxP) / 2;
+    let landingX = simulateShot(startX, startY, bestAngle, midP, 'right');
+    
+    if (landingX < targetX) {
+        maxP = midP; // Over-shot (since AI is on right, lower X means it went further left)
+    } else {
+        minP = midP;
+    }
+  }
+  bestPower = (minP + maxP) / 2;
+
+  // Add "Difficulty" factor: High error at start, becomes sniper by shot 7
+  aiShotsFired++;
+  let errorMargin = Math.max(0, 15 - (aiShotsFired * 2.2)); // Error decreases over time
+  let finalPower = bestPower + (Math.random() * errorMargin * 2 - errorMargin);
+  let finalAngle = bestAngle + (Math.random() * (errorMargin/4));
+
+  // Clamp power to game limits
+  finalPower = Math.max(10, Math.min(100, finalPower));
+
+  projectiles.push(new Projectile(rightCannon.x, rightCannon.y-10, finalAngle, finalPower, 'right'));
   playerTurn = true;
   document.getElementById("turn-info").textContent = "Your Turn";
+}
+
+/**
+ * Predicts where a shot will land using the game's actual physics logic
+ */
+function simulateShot(sx, sy, ang, pwr, side) {
+    let r = ang * Math.PI / 180;
+    let mult = pwr * 0.25;
+    let vx = Math.cos(r) * mult * (side === 'left' ? 1 : -1);
+    let vy = -Math.sin(r) * mult;
+    let x = sx, y = sy;
+    
+    // Simulate until it hits terrain or goes off screen
+    for(let i=0; i<300; i++) {
+        vx += wind * 0.01;
+        vy += GRAVITY;
+        x += vx; y += vy;
+        if (y >= getTerrainY(x) || x < 0 || x > WIDTH) break;
+    }
+    return x;
 }
 
 btnStart.onclick = () => {
   let aiSide = side === "escapers" ? "defenders" : "escapers";
   let aiList = aiSide === "escapers" ? ESCAPERS : DEFENDERS;
   aiChar = {...aiList[Math.floor(Math.random()*aiList.length)], side: aiSide};
+  
   document.getElementById("menu").style.display = "none";
+  document.getElementById("wind-info").style.display = "block";
+  document.getElementById("turn-info").style.display = "block";
   document.getElementById("power-bar-container").style.display = "block";
   document.getElementById("angle-bar-container").style.display = "block";
+  document.body.classList.add('playing');
+
   generateTerrain();
+  aiShotsFired = 0;
   leftCannon = { x: WIDTH*0.15, y: 0, health: 100, color: playerChar.color, emoji: playerChar.emoji, side: 'left', angle: 45, name: playerChar.name };
   rightCannon = { x: WIDTH*0.85, y: 0, health: 100, color: aiChar.color, emoji: aiChar.emoji, side: 'right', angle: 45, name: aiChar.name };
   gameStarted = true; animate();
